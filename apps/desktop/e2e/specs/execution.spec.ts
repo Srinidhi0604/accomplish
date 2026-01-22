@@ -769,4 +769,78 @@ test.describe('Execution Page', () => {
       ]
     );
   });
+
+  test('should copy message content to clipboard', async ({ window }) => {
+    const homePage = new HomePage(window);
+    const executionPage = new ExecutionPage(window);
+
+    await window.waitForLoadState('domcontentloaded');
+
+    // Start a task with explicit success keyword to ensure we get completed messages
+    await homePage.enterTask(TEST_SCENARIOS.SUCCESS.keyword);
+    await homePage.submitTask();
+
+    // Wait for navigation to execution page
+    await window.waitForURL(/.*#\/execution.*/, { timeout: TEST_TIMEOUTS.NAVIGATION });
+
+    // Wait for task to complete
+    await executionPage.waitForComplete();
+
+    // Capture state before copy
+    await captureForAI(
+      window,
+      'execution-copy',
+      'before-copy',
+      [
+        'Task is completed',
+        'Copy buttons are present on messages',
+        'Ready to test copy functionality'
+      ]
+    );
+
+    // Get all copy buttons (should be at least one for completed messages)
+    const copyButtonsCount = await executionPage.copyButtons.count();
+    expect(copyButtonsCount).toBeGreaterThan(0);
+
+    // Hover over the first copy button to make it visible (group-hover)
+    const firstCopyButton = executionPage.copyButtons.first();
+
+    // Force the button to be visible by hovering over its parent message container
+    // The button uses group-hover, so we need to hover the parent
+    const buttonBox = await firstCopyButton.boundingBox();
+    if (buttonBox) {
+      // Hover slightly above the button (on the message bubble) to trigger group-hover
+      await window.mouse.move(buttonBox.x + buttonBox.width / 2, buttonBox.y - 10);
+    }
+
+    // Wait for the button to become visible
+    await firstCopyButton.waitFor({ state: 'visible', timeout: 5000 });
+
+    // Click the copy button
+    await firstCopyButton.click();
+
+    // Capture state after copy
+    await captureForAI(
+      window,
+      'execution-copy',
+      'after-copy',
+      [
+        'Copy button was clicked',
+        'Icon should change to checkmark',
+        'Background should turn green',
+        'Content was copied to clipboard'
+      ]
+    );
+
+    // Verify clipboard contains content
+    const clipboardText = await window.evaluate(async () => {
+      return await navigator.clipboard.readText();
+    });
+    expect(clipboardText).toBeTruthy();
+    expect(clipboardText.length).toBeGreaterThan(0);
+
+    // Verify visual feedback - button should have green background
+    const buttonClasses = await firstCopyButton.getAttribute('class');
+    expect(buttonClasses).toContain('text-green-600');
+  });
 });

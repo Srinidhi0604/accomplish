@@ -61,6 +61,11 @@ export class ExecutionPage {
     return this.page.getByTestId('scroll-to-bottom-button');
   }
 
+  /** Get all copy buttons on the page */
+  get copyButtons() {
+    return this.page.getByTestId('message-copy-button');
+  }
+
   /** Select a question option by index (0-based) */
   async selectQuestionOption(index: number) {
     await this.questionOptions.nth(index).click();

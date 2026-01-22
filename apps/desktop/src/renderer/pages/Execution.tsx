@@ -11,7 +11,8 @@ import { hasAnyReadyProvider } from '@accomplish/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { XCircle, CornerDownLeft, ArrowLeft, CheckCircle2, AlertCircle, AlertTriangle, Terminal, Wrench, FileText, Search, Code, Brain, Clock, Square, Play, Download, File, Bug, ChevronUp, ChevronDown, Trash2, Check } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { XCircle, CornerDownLeft, ArrowLeft, CheckCircle2, AlertCircle, AlertTriangle, Terminal, Wrench, FileText, Search, Code, Brain, Clock, Square, Play, Download, File, Bug, ChevronUp, ChevronDown, Trash2, Check, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { StreamingText } from '../components/ui/streaming-text';
@@ -1179,9 +1180,13 @@ interface MessageBubbleProps {
   isLoading?: boolean;
 }
 
+const COPIED_STATE_DURATION_MS = 1000
+
 // Memoized MessageBubble to prevent unnecessary re-renders and markdown re-parsing
 const MessageBubble = memo(function MessageBubble({ message, shouldStream = false, isLastMessage = false, isRunning = false, showContinueButton = false, continueLabel, onContinue, isLoading = false }: MessageBubbleProps) {
   const [streamComplete, setStreamComplete] = useState(!shouldStream);
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUser = message.type === 'user';
   const isTool = message.type === 'tool';
   const isSystem = message.type === 'system';
@@ -1197,6 +1202,33 @@ const MessageBubble = memo(function MessageBubble({ message, shouldStream = fals
       setStreamComplete(true);
     }
   }, [shouldStream]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        setCopied(false);
+      }, COPIED_STATE_DURATION_MS);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+    }
+  }, [message.content]);
+
+  const showCopyButton = !isTool && !(isAssistant && showContinueButton);
 
   const proseClasses = cn(
     'text-sm prose prose-sm max-w-none',
@@ -1219,7 +1251,7 @@ const MessageBubble = memo(function MessageBubble({ message, shouldStream = fals
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={springs.gentle}
-      className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex flex-col group', isUser ? 'items-end' : 'items-start')}
     >
       <div
         className={cn(
@@ -1302,6 +1334,34 @@ const MessageBubble = memo(function MessageBubble({ message, shouldStream = fals
           </>
         )}
       </div>
+
+      {showCopyButton && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleCopy}
+              data-testid="message-copy-button"
+              className={cn(
+                'opacity-0 group-hover:opacity-100 transition-all duration-200 relative',
+                'p-1 rounded hover:bg-accent',
+                'shrink-0 mt-1',
+                isAssistant ? 'self-start' : 'self-end',
+                !copied && 'text-muted-foreground hover:text-foreground',
+                copied && '!bg-green-500/10 !text-green-600 !hover:bg-green-500/20'
+              )}
+              aria-label={'Copy to clipboard'}
+            >
+              <Check className={cn("absolute h-4 w-4", !copied && 'hidden')} />
+              <Copy className={cn("absolute h-4 w-4", copied && 'hidden')} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span>Copy to clipboard</span>
+          </TooltipContent>
+        </Tooltip>
+      )}
     </motion.div>
   );
 }, (prev, next) => prev.message.id === next.message.id && prev.shouldStream === next.shouldStream && prev.isLastMessage === next.isLastMessage && prev.isRunning === next.isRunning && prev.showContinueButton === next.showContinueButton && prev.isLoading === next.isLoading);

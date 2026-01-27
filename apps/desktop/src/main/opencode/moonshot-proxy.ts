@@ -4,8 +4,8 @@ import { URL } from 'url';
 
 const MOONSHOT_PROXY_PORT = 9229;
 const MAX_REQUEST_SIZE = 10 * 1024 * 1024; // 10MB limit
-// Always enable debug for now until the issue is fixed
-const DEBUG = true;
+// Set DEBUG_MOONSHOT_PROXY=1 to enable verbose logging
+const DEBUG = process.env.DEBUG_MOONSHOT_PROXY === '1';
 
 let server: http.Server | null = null;
 let targetBaseUrl: string | null = null;

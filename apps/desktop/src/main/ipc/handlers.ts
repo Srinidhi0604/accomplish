@@ -55,6 +55,7 @@ import {
   getLMStudioConfig,
   setLMStudioConfig,
 } from '../store/appSettings';
+import { safeParseJson } from '../utils/json';
 import {
   getProviderSettings,
   setActiveProvider,
@@ -1207,7 +1208,13 @@ export function registerIPCHandlers(): void {
   handle('bedrock:validate', async (_event: IpcMainInvokeEvent, credentials: string) => {
     console.log('[Bedrock] Validation requested');
 
-    const parsed = JSON.parse(credentials);
+    const parseResult = safeParseJson<BedrockCredentials>(credentials);
+    if (!parseResult.success) {
+      console.warn('[Bedrock] Failed to parse credentials:', parseResult.error);
+      return { valid: false, error: 'Failed to parse credentials' };
+    }
+    const parsed = parseResult.data;
+
     let client: BedrockClient;
     let cleanupEnv: (() => void) | null = null;
 
@@ -1228,6 +1235,9 @@ export function registerIPCHandlers(): void {
       });
     } else if (parsed.authType === 'accessKeys') {
       // Access key authentication
+      if (!parsed.accessKeyId || !parsed.secretAccessKey) {
+        return { valid: false, error: 'Access Key ID and Secret Access Key are required' };
+      }
       const awsCredentials: { accessKeyId: string; secretAccessKey: string; sessionToken?: string } = {
         accessKeyId: parsed.accessKeyId,
         secretAccessKey: parsed.secretAccessKey,

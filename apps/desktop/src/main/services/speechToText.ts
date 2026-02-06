@@ -15,7 +15,7 @@ import {
   type SpeechServiceAPI,
   type TranscriptionResult,
   type TranscriptionError,
-} from '@accomplish/agent-core';
+} from '@accomplish_ai/agent-core';
 
 // Re-export types from core
 export type { TranscriptionResult, TranscriptionError };

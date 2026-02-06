@@ -2,7 +2,7 @@
 export {
   OpenCodeCliNotFoundError,
   createTaskManager,
-} from '@accomplish/agent-core';
+} from '@accomplish_ai/agent-core';
 
 // Types from agent-core
 export type {
@@ -10,7 +10,7 @@ export type {
   TaskCallbacks,
   TaskProgressEvent,
   TaskManagerAPI,
-} from '@accomplish/agent-core';
+} from '@accomplish_ai/agent-core';
 
 export {
   createElectronTaskManagerOptions,
@@ -34,7 +34,7 @@ export {
 
 export { loginOpenAiWithChatGpt } from './auth-browser';
 
-import { createTaskManager, type TaskManagerAPI } from '@accomplish/agent-core';
+import { createTaskManager, type TaskManagerAPI } from '@accomplish_ai/agent-core';
 import {
   createElectronTaskManagerOptions,
   isCliAvailable,

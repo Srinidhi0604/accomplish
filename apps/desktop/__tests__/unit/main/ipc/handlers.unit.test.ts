@@ -124,9 +124,9 @@ let mockOnboardingComplete = false;
 let mockSelectedModel: { provider: string; model: string } | null = null;
 let mockOpenAiBaseUrl = '';
 
-// Mock @accomplish/agent-core - comprehensive mock covering all exports used by handlers.ts
-vi.mock('@accomplish/agent-core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@accomplish/agent-core')>();
+// Mock @accomplish_ai/agent-core - comprehensive mock covering all exports used by handlers.ts
+vi.mock('@accomplish_ai/agent-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@accomplish_ai/agent-core')>();
   return {
     // Use actual implementation for API validation since tests stub fetch
     validateApiKey: actual.validateApiKey,
@@ -583,7 +583,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('settings:set-debug-mode', true);
 
       // Assert
-      const { setDebugMode } = await import('@accomplish/agent-core');
+      const { setDebugMode } = await import('@accomplish_ai/agent-core');
       expect(setDebugMode).toHaveBeenCalledWith(true);
     });
 
@@ -847,7 +847,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('task:delete', taskId);
 
       // Assert
-      const { deleteTask } = await import('@accomplish/agent-core');
+      const { deleteTask } = await import('@accomplish_ai/agent-core');
       expect(deleteTask).toHaveBeenCalledWith(taskId);
     });
 
@@ -874,7 +874,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('task:clear-history');
 
       // Assert
-      const { clearHistory } = await import('@accomplish/agent-core');
+      const { clearHistory } = await import('@accomplish_ai/agent-core');
       expect(clearHistory).toHaveBeenCalled();
     });
   });
@@ -932,7 +932,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('onboarding:set-complete', true);
 
       // Assert
-      const { setOnboardingComplete } = await import('@accomplish/agent-core');
+      const { setOnboardingComplete } = await import('@accomplish_ai/agent-core');
       expect(setOnboardingComplete).toHaveBeenCalledWith(true);
     });
   });
@@ -1063,7 +1063,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('model:set', newModel);
 
       // Assert
-      const { setSelectedModel } = await import('@accomplish/agent-core');
+      const { setSelectedModel } = await import('@accomplish_ai/agent-core');
       expect(setSelectedModel).toHaveBeenCalledWith(newModel);
     });
 
@@ -1402,7 +1402,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('task:start', config);
 
       // Assert
-      const { saveTask } = await import('@accomplish/agent-core');
+      const { saveTask } = await import('@accomplish_ai/agent-core');
       expect(saveTask).toHaveBeenCalled();
     });
 
@@ -1526,7 +1526,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('session:resume', sessionId, prompt, existingTaskId);
 
       // Assert
-      const { addTaskMessage } = await import('@accomplish/agent-core');
+      const { addTaskMessage } = await import('@accomplish_ai/agent-core');
       expect(addTaskMessage).toHaveBeenCalledWith(
         existingTaskId,
         expect.objectContaining({
@@ -1554,7 +1554,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('session:resume', sessionId, prompt, existingTaskId);
 
       // Assert
-      const { updateTaskStatus } = await import('@accomplish/agent-core');
+      const { updateTaskStatus } = await import('@accomplish_ai/agent-core');
       expect(updateTaskStatus).toHaveBeenCalledWith(
         existingTaskId,
         'running',
@@ -1579,7 +1579,7 @@ describe('IPC Handlers Integration', () => {
       await invokeHandler('session:resume', sessionId, prompt);
 
       // Assert
-      const { addTaskMessage } = await import('@accomplish/agent-core');
+      const { addTaskMessage } = await import('@accomplish_ai/agent-core');
       // Should not be called for new tasks
       expect(addTaskMessage).not.toHaveBeenCalledWith(
         undefined,

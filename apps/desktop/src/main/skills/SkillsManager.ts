@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import path from 'path';
-import { createSkillsManager, type SkillsManagerAPI } from '@accomplish/agent-core';
+import { createSkillsManager, type SkillsManagerAPI } from '@accomplish_ai/agent-core';
 
 function getBundledSkillsPath(): string {
   if (app.isPackaged) {

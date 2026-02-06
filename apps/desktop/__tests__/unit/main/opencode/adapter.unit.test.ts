@@ -27,7 +27,7 @@ import type {
   OpenCodeToolUseMessage,
   OpenCodeStepFinishMessage,
   OpenCodeErrorMessage,
-} from '@accomplish/agent-core';
+} from '@accomplish_ai/agent-core';
 
 // Mock electron module
 const mockApp = {
@@ -104,8 +104,8 @@ vi.mock('node-pty', () => ({
 // This will be accessed by the mocked OpenCodeAdapter
 const mockPtyInstanceRef = { current: null as MockPty | null };
 
-// Mock @accomplish/agent-core - agent-core package exports used by adapter
-vi.mock('@accomplish/agent-core', async () => {
+// Mock @accomplish_ai/agent-core - agent-core package exports used by adapter
+vi.mock('@accomplish_ai/agent-core', async () => {
   const { EventEmitter } = await import('events');
   const nodePty = await import('node-pty');
 
@@ -774,8 +774,8 @@ describe('OpenCode Adapter Module', () => {
 
     // Re-import modules to get fresh state
     const desktopModule = await import('@main/opencode');
-    // OpenCodeAdapter is now internal to agent-core, get it from the mocked @accomplish/agent-core module
-    const agentCoreModule = await import('@accomplish/agent-core');
+    // OpenCodeAdapter is now internal to agent-core, get it from the mocked @accomplish_ai/agent-core module
+    const agentCoreModule = await import('@accomplish_ai/agent-core');
     OpenCodeAdapter = (agentCoreModule as unknown as { OpenCodeAdapter: unknown }).OpenCodeAdapter;
     isOpenCodeCliInstalled = desktopModule.isOpenCodeCliInstalled;
     getOpenCodeCliVersion = desktopModule.getOpenCodeCliVersion;

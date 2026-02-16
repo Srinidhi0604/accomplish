@@ -70,6 +70,19 @@ interface RunDockerCommandOptions {
  */
 export function runDockerCommand(args: string[], options: RunDockerCommandOptions): Promise<DockerCommandResult> {
   return new Promise((resolve) => {
+    let finished = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (result: DockerCommandResult): void => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      resolve(result);
+    };
+
     const child = spawn('docker', args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
@@ -78,7 +91,7 @@ export function runDockerCommand(args: string[], options: RunDockerCommandOption
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       try {
         child.kill('SIGKILL');
       } catch {
@@ -96,17 +109,16 @@ export function runDockerCommand(args: string[], options: RunDockerCommandOption
     });
 
     child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({
+      finish({
         exitCode: typeof code === 'number' ? code : 1,
         stdout: Buffer.concat(stdoutChunks).toString('utf-8'),
         stderr: Buffer.concat(stderrChunks).toString('utf-8'),
       });
     });
 
-    child.on('error', () => {
-      clearTimeout(timer);
-      resolve({ exitCode: 1, stdout: '', stderr: 'Failed to start docker command' });
+    child.on('error', (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      finish({ exitCode: 1, stdout: '', stderr: `Failed to start docker command: ${message}` });
     });
   });
 }

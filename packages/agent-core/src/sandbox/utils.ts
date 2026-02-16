@@ -5,17 +5,24 @@ import { randomBytes } from 'crypto';
  * the real Node.js global process.
  */
 export interface ProcessLike {
-  on: (event: string, listener: (...args: any[]) => void) => unknown;
-  removeListener: (event: string, listener: (...args: any[]) => void) => unknown;
-  exit: (code?: number) => never;
-  exitCode?: string | number | null | undefined;
+  on(event: 'exit', listener: (code: number) => void): unknown;
+  on(event: 'SIGINT' | 'SIGTERM', listener: () => void): unknown;
+  removeListener(event: 'exit', listener: (code: number) => void): unknown;
+  removeListener(event: 'SIGINT' | 'SIGTERM', listener: () => void): unknown;
+  exit(code?: number): never;
+  /** Matches Node.js `process.exitCode` typing in this repo. */
+  exitCode?: NodeJS.Process['exitCode'];
+  /** Optional process id (available on real `process`). */
+  pid?: number;
+  /** Optional kill function (available on real `process`). */
+  kill?: (pid: number, signal: NodeJS.Signals) => boolean;
 }
 
 type CleanupCallback = () => void;
 
 const cleanupCallbacks = new Set<CleanupCallback>();
-let handlersRegistered = false;
-let cleanupExecuted = false;
+const registeredProcesses = new WeakSet<object>();
+let cleanupInProgress = false;
 
 /**
  * Generates a unique Docker container name.
@@ -55,42 +62,75 @@ export function unregisterSandboxCleanupCallback(callback: CleanupCallback): voi
  * @param targetProcess Process object (defaults to global `process`)
  */
 export function ensureSandboxProcessCleanupHandlers(targetProcess: ProcessLike = process): void {
-  if (handlersRegistered) {
+  if (registeredProcesses.has(targetProcess as unknown as object)) {
     return;
   }
-  handlersRegistered = true;
+  registeredProcesses.add(targetProcess as unknown as object);
 
-  const runCleanupOnce = (): void => {
-    if (cleanupExecuted) {
+  const runCleanup = (): void => {
+    if (cleanupInProgress) {
       return;
     }
-    cleanupExecuted = true;
+    cleanupInProgress = true;
 
-    for (const callback of cleanupCallbacks) {
+    const callbacks = Array.from(cleanupCallbacks);
+    for (const callback of callbacks) {
       try {
         callback();
       } catch {
         // Best-effort cleanup.
       }
     }
+
+    cleanupInProgress = false;
   };
 
-  const onExit = (): void => {
-    runCleanupOnce();
+  const onExit = (_code: number): void => {
+    runCleanup();
   };
 
   const onSigint = (): void => {
-    runCleanupOnce();
-    const code = typeof targetProcess.exitCode === 'number' ? targetProcess.exitCode : 130;
-    targetProcess.exitCode = code;
-    targetProcess.exit(code);
+    runCleanup();
+
+    if (typeof targetProcess.exitCode !== 'number') {
+      targetProcess.exitCode = 130;
+    }
+
+    // Prevent infinite recursion if we re-send the signal.
+    targetProcess.removeListener('SIGINT', onSigint);
+
+    if (typeof targetProcess.kill === 'function' && typeof targetProcess.pid === 'number') {
+      try {
+        targetProcess.kill(targetProcess.pid, 'SIGINT');
+        return;
+      } catch {
+        // Fallback to exit.
+      }
+    }
+
+    targetProcess.exit(targetProcess.exitCode);
   };
 
   const onSigterm = (): void => {
-    runCleanupOnce();
-    const code = typeof targetProcess.exitCode === 'number' ? targetProcess.exitCode : 143;
-    targetProcess.exitCode = code;
-    targetProcess.exit(code);
+    runCleanup();
+
+    if (typeof targetProcess.exitCode !== 'number') {
+      targetProcess.exitCode = 143;
+    }
+
+    // Prevent infinite recursion if we re-send the signal.
+    targetProcess.removeListener('SIGTERM', onSigterm);
+
+    if (typeof targetProcess.kill === 'function' && typeof targetProcess.pid === 'number') {
+      try {
+        targetProcess.kill(targetProcess.pid, 'SIGTERM');
+        return;
+      } catch {
+        // Fallback to exit.
+      }
+    }
+
+    targetProcess.exit(targetProcess.exitCode);
   };
 
   targetProcess.on('exit', onExit);

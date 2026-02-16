@@ -11,6 +11,8 @@ import type { OpenCodeMessage } from '../../common/types/opencode.js';
 import type { PermissionRequest } from '../../common/types/permission.js';
 import type { TodoItem } from '../../common/types/todo.js';
 import { serializeError } from '../../utils/error.js';
+import type { SandboxConfig, ResolvedSandboxConfig } from '../../sandbox/config.js';
+import { buildDockerRunSpec, disposeDockerRunSpec, prepareDockerSandbox } from '../../sandbox/runner.js';
 
 const LOG_TRUNCATION_LIMIT = 500;
 
@@ -32,6 +34,8 @@ export interface AdapterOptions {
   buildCliArgs: (config: TaskConfig) => Promise<string[]>;
   onBeforeStart?: () => Promise<void>;
   getModelDisplayName?: (modelId: string) => string;
+  /** Optional Docker sandbox execution configuration. */
+  sandbox?: SandboxConfig;
 }
 
 export interface OpenCodeAdapterEvents {
@@ -64,6 +68,8 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
   private hasReceivedFirstTool: boolean = false;
   private startTaskCalled: boolean = false;
   private options: AdapterOptions;
+  private sandboxConfig: ResolvedSandboxConfig | null = null;
+  private activeDockerSpecCleanup: (() => void) | null = null;
 
   constructor(options: AdapterOptions, taskId?: string) {
     super();
@@ -208,25 +214,58 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     this.emit('debug', { type: 'info', message: cwdMsg });
 
     {
-      const fullCommand = this.buildShellCommand(command, allArgs);
+      if (this.options.sandbox?.enabled) {
+        const sandbox = this.options.sandbox;
+        const log = (message: string): void => {
+          console.log(message);
+          this.emit('debug', { type: 'info', message });
+        };
 
-      const shellCmdMsg = `Full shell command: ${fullCommand}`;
-      console.log('[OpenCode CLI]', shellCmdMsg);
-      this.emit('debug', { type: 'info', message: shellCmdMsg });
+        this.sandboxConfig = await prepareDockerSandbox(sandbox, log);
 
-      const shellCmd = this.getPlatformShell();
-      const shellArgs = this.getShellArgs(fullCommand);
-      const shellMsg = `Using shell: ${shellCmd} ${shellArgs.join(' ')}`;
-      console.log('[OpenCode CLI]', shellMsg);
-      this.emit('debug', { type: 'info', message: shellMsg });
+        const dockerSpec = buildDockerRunSpec(this.sandboxConfig, {
+          cwd: safeCwd,
+          command,
+          args: allArgs,
+          env,
+        });
 
-      this.ptyProcess = pty.spawn(shellCmd, shellArgs, {
-        name: 'xterm-256color',
-        cols: 32000,
-        rows: 30,
-        cwd: safeCwd,
-        env: env as { [key: string]: string },
-      });
+        this.activeDockerSpecCleanup = (): void => {
+          disposeDockerRunSpec(dockerSpec);
+        };
+
+        const dockerMsg = `Using Docker sandbox: docker ${dockerSpec.redactedArgs.join(' ')}`;
+        console.log('[OpenCode CLI]', dockerMsg);
+        this.emit('debug', { type: 'info', message: dockerMsg });
+
+        this.ptyProcess = pty.spawn(dockerSpec.command, dockerSpec.args, {
+          name: 'xterm-256color',
+          cols: 32000,
+          rows: 30,
+          cwd: safeCwd,
+          env: env as { [key: string]: string },
+        });
+      } else {
+        const fullCommand = this.buildShellCommand(command, allArgs);
+
+        const shellCmdMsg = `Full shell command: ${fullCommand}`;
+        console.log('[OpenCode CLI]', shellCmdMsg);
+        this.emit('debug', { type: 'info', message: shellCmdMsg });
+
+        const shellCmd = this.getPlatformShell();
+        const shellArgs = this.getShellArgs(fullCommand);
+        const shellMsg = `Using shell: ${shellCmd} ${shellArgs.join(' ')}`;
+        console.log('[OpenCode CLI]', shellMsg);
+        this.emit('debug', { type: 'info', message: shellMsg });
+
+        this.ptyProcess = pty.spawn(shellCmd, shellArgs, {
+          name: 'xterm-256color',
+          cols: 32000,
+          rows: 30,
+          cwd: safeCwd,
+          env: env as { [key: string]: string },
+        });
+      }
       const pidMsg = `PTY Process PID: ${this.ptyProcess.pid}`;
       console.log('[OpenCode CLI]', pidMsg);
       this.emit('debug', { type: 'info', message: pidMsg });
@@ -251,6 +290,13 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
         const exitMsg = `PTY Process exited with code: ${exitCode}, signal: ${signal}`;
         console.log('[OpenCode CLI]', exitMsg);
         this.emit('debug', { type: 'exit', message: exitMsg, data: { exitCode, signal } });
+        if (this.activeDockerSpecCleanup) {
+          try {
+            this.activeDockerSpecCleanup();
+          } catch {
+          }
+          this.activeDockerSpecCleanup = null;
+        }
         this.handleProcessExit(exitCode);
       });
     }
@@ -346,6 +392,14 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
         console.error('[OpenCode Adapter] Error killing PTY process:', error);
       }
       this.ptyProcess = null;
+    }
+
+    if (this.activeDockerSpecCleanup) {
+      try {
+        this.activeDockerSpecCleanup();
+      } catch {
+      }
+      this.activeDockerSpecCleanup = null;
     }
 
     this.currentSessionId = null;
@@ -695,18 +749,46 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     const allArgs = [...baseArgs, ...cliArgs];
     const safeCwd = config.workingDirectory || this.options.tempPath;
 
-    const fullCommand = this.buildShellCommand(command, allArgs);
+    if (this.options.sandbox?.enabled) {
+      const sandbox = this.options.sandbox;
+      const log = (message: string): void => {
+        console.log(message);
+        this.emit('debug', { type: 'info', message });
+      };
 
-    const shellCmd = this.getPlatformShell();
-    const shellArgs = this.getShellArgs(fullCommand);
+      this.sandboxConfig = await prepareDockerSandbox(sandbox, log);
+      const dockerSpec = buildDockerRunSpec(this.sandboxConfig, {
+        cwd: safeCwd,
+        command,
+        args: allArgs,
+        env,
+      });
 
-    this.ptyProcess = pty.spawn(shellCmd, shellArgs, {
-      name: 'xterm-256color',
-      cols: 32000,
-      rows: 30,
-      cwd: safeCwd,
-      env: env as { [key: string]: string },
-    });
+      this.activeDockerSpecCleanup = (): void => {
+        disposeDockerRunSpec(dockerSpec);
+      };
+
+      this.ptyProcess = pty.spawn(dockerSpec.command, dockerSpec.args, {
+        name: 'xterm-256color',
+        cols: 32000,
+        rows: 30,
+        cwd: safeCwd,
+        env: env as { [key: string]: string },
+      });
+    } else {
+      const fullCommand = this.buildShellCommand(command, allArgs);
+
+      const shellCmd = this.getPlatformShell();
+      const shellArgs = this.getShellArgs(fullCommand);
+
+      this.ptyProcess = pty.spawn(shellCmd, shellArgs, {
+        name: 'xterm-256color',
+        cols: 32000,
+        rows: 30,
+        cwd: safeCwd,
+        env: env as { [key: string]: string },
+      });
+    }
 
     this.ptyProcess.onData((data: string) => {
       const cleanData = data
@@ -723,6 +805,13 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     });
 
     this.ptyProcess.onExit(({ exitCode }) => {
+      if (this.activeDockerSpecCleanup) {
+        try {
+          this.activeDockerSpecCleanup();
+        } catch {
+        }
+        this.activeDockerSpecCleanup = null;
+      }
       this.handleProcessExit(exitCode);
     });
   }

@@ -9,6 +9,7 @@ import type { Task, TaskConfig, TaskStatus, TaskMessage, TaskResult } from '../c
 import type { PermissionRequest } from '../common/types/permission';
 import type { TodoItem } from '../common/types/todo';
 import type { OpenCodeMessage } from '../common/types/opencode';
+import type { SandboxConfig } from '../sandbox/config.js';
 
 /** Progress event emitted during task execution */
 export interface TaskProgressEvent {
@@ -89,6 +90,9 @@ export interface TaskAdapterOptions {
   onBeforeStart?: () => Promise<void>;
   /** Function to get display name for a model ID */
   getModelDisplayName?: (modelId: string) => string;
+
+  /** Optional Docker sandbox execution configuration. */
+  sandbox?: SandboxConfig;
 }
 
 /** Options for creating a TaskManager instance */

@@ -1,29 +1,25 @@
-import * as crypto from 'crypto';
 import * as pty from 'node-pty';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
 
-import { StreamParser } from './StreamParser.js';
-import { OpenCodeLogWatcher, createLogWatcher, OpenCodeLogError } from './OpenCodeLogWatcher.js';
-import {
-  CompletionEnforcer,
-  CompletionEnforcerCallbacks,
-} from '../../opencode/completion/index.js';
-import type { TaskConfig, Task, TaskMessage, TaskResult } from '../../common/types/task.js';
-import type { OpenCodeMessage } from '../../common/types/opencode.js';
-import type { PermissionRequest } from '../../common/types/permission.js';
-import type { TodoItem } from '../../common/types/todo.js';
-import { serializeError } from '../../utils/error.js';
-import type { SandboxConfig, ResolvedSandboxConfig } from '../../sandbox/config.js';
-import { buildDockerRunSpec, disposeDockerRunSpec, prepareDockerSandbox } from '../../sandbox/runner.js';
+import { StreamParser } from './stream-parser.js';
+import { OpenCodeLogWatcher, createLogWatcher, OpenCodeLogError } from './log-watcher.js';
+import { CompletionEnforcer, CompletionEnforcerCallbacks } from './completion/index.js';
+import type { TaskConfig, Task, TaskMessage, TaskResult } from '../common/types/task.js';
+import type { OpenCodeMessage } from '../common/types/opencode.js';
+import type { PermissionRequest } from '../common/types/permission.js';
+import type { TodoItem } from '../common/types/todo.js';
+import { serializeError } from '../utils/error.js';
+import type { SandboxConfig, ResolvedSandboxConfig } from '../sandbox/config.js';
+import { buildDockerRunSpec, disposeDockerRunSpec, prepareDockerSandbox } from '../sandbox/runner.js';
 
 const LOG_TRUNCATION_LIMIT = 500;
 
 export class OpenCodeCliNotFoundError extends Error {
   constructor() {
     super(
-      'OpenCode CLI is not available. The bundled CLI may be missing or corrupted. Please reinstall the application.',
+      'OpenCode CLI is not available. The bundled CLI may be missing or corrupted. Please reinstall the application.'
     );
     this.name = 'OpenCodeCliNotFoundError';
   }
@@ -53,28 +49,6 @@ export interface OpenCodeAdapterEvents {
   debug: [{ type: string; message: string; data?: unknown }];
   'todo:update': [TodoItem[]];
   'auth-error': [{ providerId: string; message: string }];
-  reasoning: [string];
-  'tool-call-complete': [
-    {
-      toolName: string;
-      toolInput: unknown;
-      toolOutput: string;
-      sessionId?: string;
-    },
-  ];
-  'step-finish': [
-    {
-      reason: string;
-      model?: string;
-      tokens?: {
-        input: number;
-        output: number;
-        reasoning: number;
-        cache?: { read: number; write: number };
-      };
-      cost?: number;
-    },
-  ];
 }
 
 export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
@@ -223,10 +197,7 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
       const dummyPackageJson = path.join(safeCwd, 'package.json');
       if (!fs.existsSync(dummyPackageJson)) {
         try {
-          fs.writeFileSync(
-            dummyPackageJson,
-            JSON.stringify({ name: 'opencode-workspace', private: true }, null, 2),
-          );
+          fs.writeFileSync(dummyPackageJson, JSON.stringify({ name: 'opencode-workspace', private: true }, null, 2));
           console.log('[OpenCode CLI] Created workspace package.json at:', dummyPackageJson);
         } catch (err) {
           console.warn('[OpenCode CLI] Could not create workspace package.json:', err);
@@ -243,21 +214,6 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     this.emit('debug', { type: 'info', message: cwdMsg });
 
     {
-<<<<<<< HEAD
-      const { file: spawnFile, args: spawnArgs } = this.buildPtySpawnArgs(command, allArgs);
-
-      const spawnMsg = `PTY spawn: ${spawnFile} ${spawnArgs.join(' ')}`;
-      console.log('[OpenCode CLI]', spawnMsg);
-      this.emit('debug', { type: 'info', message: spawnMsg });
-
-      this.ptyProcess = pty.spawn(spawnFile, spawnArgs, {
-        name: 'xterm-256color',
-        cols: 32000,
-        rows: 30,
-        cwd: safeCwd,
-        env: env as { [key: string]: string },
-      });
-=======
       if (this.options.sandbox?.enabled) {
         const sandbox = this.options.sandbox;
         const log = (message: string): void => {
@@ -310,7 +266,6 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
           env: env as { [key: string]: string },
         });
       }
->>>>>>> feat/sandbox-secure-execution
       const pidMsg = `PTY Process PID: ${this.ptyProcess.pid}`;
       console.log('[OpenCode CLI]', pidMsg);
       this.emit('debug', { type: 'info', message: pidMsg });
@@ -318,16 +273,12 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
       this.emit('progress', { stage: 'loading', message: 'Loading agent...' });
 
       this.ptyProcess.onData((data: string) => {
-        /* eslint-disable no-control-regex */
         const cleanData = data
           .replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, '')
           .replace(/\x1B\][^\x07]*\x07/g, '')
           .replace(/\x1B\][^\x1B]*\x1B\\/g, '');
-        /* eslint-enable no-control-regex */
         if (cleanData.trim()) {
-          const truncated =
-            cleanData.substring(0, LOG_TRUNCATION_LIMIT) +
-            (cleanData.length > LOG_TRUNCATION_LIMIT ? '...' : '');
+          const truncated = cleanData.substring(0, LOG_TRUNCATION_LIMIT) + (cleanData.length > LOG_TRUNCATION_LIMIT ? '...' : '');
           console.log('[OpenCode CLI stdout]:', truncated);
           this.emit('debug', { type: 'stdout', message: cleanData });
 
@@ -477,7 +428,7 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
       }
       return arg;
     } else {
-      const needsEscaping = ["'", ' ', '$', '`', '\\', '"', '\n'].some((c) => arg.includes(c));
+      const needsEscaping = ["'", ' ', '$', '`', '\\', '"', '\n'].some(c => arg.includes(c));
       if (needsEscaping) {
         return `'${arg.replace(/'/g, "'\\''")}'`;
       }
@@ -487,7 +438,7 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
 
   private buildShellCommand(command: string, args: string[]): string {
     const escapedCommand = this.escapeShellArg(command);
-    const escapedArgs = args.map((arg) => this.escapeShellArg(arg));
+    const escapedArgs = args.map(arg => this.escapeShellArg(arg));
     return [escapedCommand, ...escapedArgs].join(' ');
   }
 
@@ -503,15 +454,15 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
   }
 
   private handleMessage(message: OpenCodeMessage): void {
+
     console.log('[OpenCode Adapter] Handling message type:', message.type);
 
     switch (message.type) {
-      case 'step_start': {
+      case 'step_start':
         this.currentSessionId = message.part.sessionID;
-        const modelDisplayName =
-          this.currentModelId && this.options.getModelDisplayName
-            ? this.options.getModelDisplayName(this.currentModelId)
-            : 'AI';
+        const modelDisplayName = this.currentModelId && this.options.getModelDisplayName
+          ? this.options.getModelDisplayName(this.currentModelId)
+          : 'AI';
         this.emit('progress', {
           stage: 'connecting',
           message: `Connecting to ${modelDisplayName}...`,
@@ -526,15 +477,12 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
           }
         }, 500);
         break;
-      }
 
       case 'text':
         if (!this.currentSessionId && message.part.sessionID) {
           this.currentSessionId = message.part.sessionID;
         }
-        if (!this.completionEnforcer.isInContinuation()) {
-          this.emit('message', message);
-        }
+        this.emit('message', message);
 
         if (message.part.text) {
           const taskMessage: TaskMessage = {
@@ -544,23 +492,15 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
             timestamp: new Date().toISOString(),
           };
           this.messages.push(taskMessage);
-          if (!this.completionEnforcer.isInContinuation()) {
-            this.emit('reasoning', message.part.text);
-          }
         }
         break;
 
       case 'tool_call':
-        this.handleToolCall(
-          message.part.tool || 'unknown',
-          message.part.input,
-          message.part.sessionID,
-        );
+        this.handleToolCall(message.part.tool || 'unknown', message.part.input, message.part.sessionID);
         break;
 
-      case 'tool_use': {
-        const toolUseMessage =
-          message as import('../../common/types/opencode.js').OpenCodeToolUseMessage;
+      case 'tool_use':
+        const toolUseMessage = message as import('../common/types/opencode.js').OpenCodeToolUseMessage;
         const toolUseName = toolUseMessage.part.tool || 'unknown';
         const toolUseInput = toolUseMessage.part.state?.input;
         const toolUseOutput = toolUseMessage.part.state?.output || '';
@@ -580,7 +520,7 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
               type: 'text',
               text: toolDescription,
             },
-          } as import('../../common/types/opencode.js').OpenCodeTextMessage;
+          } as import('../common/types/opencode.js').OpenCodeTextMessage;
           this.emit('message', syntheticTextMessage);
         }
 
@@ -591,31 +531,20 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
 
         if (toolUseStatus === 'completed' || toolUseStatus === 'error') {
           this.emit('tool-result', toolUseOutput);
-          this.emit('tool-call-complete', {
-            toolName: toolUseName,
-            toolInput: toolUseInput,
-            toolOutput: toolUseOutput,
-            sessionId: this.currentSessionId || undefined,
-          });
         }
 
+        if (toolUseName === 'AskUserQuestion') {
+          this.handleAskUserQuestion(toolUseInput as AskUserQuestionInput);
+        }
         break;
-      }
 
-      case 'tool_result': {
+      case 'tool_result':
         const toolOutput = message.part.output || '';
         console.log('[OpenCode Adapter] Tool result received, length:', toolOutput.length);
         this.emit('tool-result', toolOutput);
         break;
-      }
 
-      case 'step_finish': {
-        this.emit('step-finish', {
-          reason: message.part.reason,
-          model: this.currentModelId || undefined,
-          tokens: message.part.tokens,
-          cost: message.part.cost,
-        });
+      case 'step_finish':
         if (message.part.reason === 'error') {
           if (!this.hasCompleted) {
             this.hasCompleted = true;
@@ -639,7 +568,6 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
           });
         }
         break;
-      }
 
       case 'error':
         this.hasCompleted = true;
@@ -650,10 +578,9 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
         });
         break;
 
-      default: {
+      default:
         const unknownMessage = message as unknown as { type: string };
         console.log('[OpenCode Adapter] Unknown message type:', unknownMessage.type);
-      }
     }
   }
 
@@ -703,7 +630,7 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     if (toolName === 'complete_task' || toolName.endsWith('_complete_task')) {
       this.completionEnforcer.handleCompleteTaskDetection(toolInput);
       const completeInput = toolInput as { summary?: string };
-      if (completeInput?.summary && this.completionEnforcer.shouldComplete()) {
+      if (completeInput?.summary) {
         this.emit('message', {
           type: 'text',
           part: {
@@ -722,17 +649,10 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     }
 
     if (toolName === 'todowrite' || toolName.endsWith('_todowrite')) {
-      const input = toolInput as { todos?: Array<Partial<TodoItem> & { content: string }> };
+      const input = toolInput as { todos?: TodoItem[] };
       if (input?.todos && Array.isArray(input.todos) && input.todos.length > 0) {
-        // OpenCode's todowrite doesn't include an id field — synthesize a unique one
-        const todos: TodoItem[] = input.todos.map((todo) => ({
-          id: todo.id || crypto.randomUUID(),
-          content: todo.content,
-          status: (todo.status as TodoItem['status']) || 'pending',
-          priority: (todo.priority as TodoItem['priority']) || 'medium',
-        }));
-        this.emit('todo:update', todos);
-        this.completionEnforcer.updateTodos(todos);
+        this.emit('todo:update', input.todos);
+        this.completionEnforcer.updateTodos(input.todos);
       }
     }
 
@@ -741,6 +661,30 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
       stage: 'tool-use',
       message: `Using ${toolName}`,
     });
+
+    if (toolName === 'AskUserQuestion') {
+      this.handleAskUserQuestion(toolInput as AskUserQuestionInput);
+    }
+  }
+
+  private handleAskUserQuestion(input: AskUserQuestionInput): void {
+    const question = input.questions?.[0];
+    if (!question) return;
+
+    const permissionRequest: PermissionRequest = {
+      id: this.generateRequestId(),
+      taskId: this.currentTaskId || '',
+      type: 'question',
+      question: question.question,
+      options: question.options?.map((o) => ({
+        label: o.label,
+        description: o.description,
+      })),
+      multiSelect: question.multiSelect,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.emit('permission-request', permissionRequest);
   }
 
   private handleProcessExit(code: number | null): void {
@@ -798,28 +742,13 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     const cliArgs = await this.options.buildCliArgs(config);
 
     const { command, args: baseArgs } = this.options.getCliCommand();
-    console.log(
-      '[OpenCode Adapter] Session resumption command:',
-      command,
-      [...baseArgs, ...cliArgs].join(' '),
-    );
+    console.log('[OpenCode Adapter] Session resumption command:', command, [...baseArgs, ...cliArgs].join(' '));
 
     const env = await this.options.buildEnvironment(this.currentTaskId || 'default');
 
     const allArgs = [...baseArgs, ...cliArgs];
     const safeCwd = config.workingDirectory || this.options.tempPath;
 
-<<<<<<< HEAD
-    const { file: spawnFile, args: spawnArgs } = this.buildPtySpawnArgs(command, allArgs);
-
-    this.ptyProcess = pty.spawn(spawnFile, spawnArgs, {
-      name: 'xterm-256color',
-      cols: 32000,
-      rows: 30,
-      cwd: safeCwd,
-      env: env as { [key: string]: string },
-    });
-=======
     if (this.options.sandbox?.enabled) {
       const sandbox = this.options.sandbox;
       const log = (message: string): void => {
@@ -860,19 +789,14 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
         env: env as { [key: string]: string },
       });
     }
->>>>>>> feat/sandbox-secure-execution
 
     this.ptyProcess.onData((data: string) => {
-      /* eslint-disable no-control-regex */
       const cleanData = data
         .replace(/\x1B\[[0-9;?]*[a-zA-Z]/g, '')
         .replace(/\x1B\][^\x07]*\x07/g, '')
         .replace(/\x1B\][^\x1B]*\x1B\\/g, '');
-      /* eslint-enable no-control-regex */
       if (cleanData.trim()) {
-        const truncated =
-          cleanData.substring(0, LOG_TRUNCATION_LIMIT) +
-          (cleanData.length > LOG_TRUNCATION_LIMIT ? '...' : '');
+        const truncated = cleanData.substring(0, LOG_TRUNCATION_LIMIT) + (cleanData.length > LOG_TRUNCATION_LIMIT ? '...' : '');
         console.log('[OpenCode CLI stdout]:', truncated);
         this.emit('debug', { type: 'stdout', message: cleanData });
 
@@ -929,16 +853,10 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
   ]);
 
   private isNonTaskContinuationTool(toolName: string): boolean {
-    if (toolName === 'skill' || toolName.endsWith('_skill')) {
-      return true;
-    }
-    if (this.isStartTaskTool(toolName)) {
-      return true;
-    }
+    if (toolName === 'skill' || toolName.endsWith('_skill')) { return true; }
+    if (this.isStartTaskTool(toolName)) { return true; }
     for (const tool of OpenCodeAdapter.NON_TASK_TOOLS) {
-      if (toolName === tool || toolName.endsWith(`_${tool}`)) {
-        return true;
-      }
+      if (toolName === tool || toolName.endsWith(`_${tool}`)) { return true; }
     }
     return false;
   }
@@ -947,7 +865,9 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     const verificationSection = input.verification?.length
       ? `\n\n**Verification:**\n${input.verification.map((v, i) => `${i + 1}. ${v}`).join('\n')}`
       : '';
-    const skillsSection = input.skills?.length ? `\n\n**Skills:** ${input.skills.join(', ')}` : '';
+    const skillsSection = input.skills?.length
+      ? `\n\n**Skills:** ${input.skills.join(', ')}`
+      : '';
     const planText = `**Plan:**\n\n**Goal:** ${input.goal}\n\n**Steps:**\n${input.steps?.map((s, i) => `${i + 1}. ${s}`).join('\n') ?? ''}${verificationSection}${skillsSection}`;
 
     const syntheticMessage: OpenCodeMessage = {
@@ -961,35 +881,44 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
         type: 'text',
         text: planText,
       },
-    } as import('../../common/types/opencode.js').OpenCodeTextMessage;
+    } as import('../common/types/opencode.js').OpenCodeTextMessage;
 
     this.emit('message', syntheticMessage);
     console.log('[OpenCode Adapter] Emitted synthetic plan message');
   }
 
-  private buildPtySpawnArgs(command: string, args: string[]): { file: string; args: string[] } {
+  private getPlatformShell(): string {
     if (this.options.platform === 'win32') {
-      // Windows policy: always spawn the real .exe, never cmd wrappers.
-      if (command.toLowerCase().endsWith('.exe')) {
-        return { file: command, args };
+      return 'cmd.exe';
+    } else if (this.options.isPackaged && this.options.platform === 'darwin') {
+      return '/bin/sh';
+    } else {
+      const userShell = process.env.SHELL;
+      if (userShell) {
+        return userShell;
       }
-
-      throw new Error(`Windows CLI command must resolve to an .exe path. Received: ${command}`);
+      if (fs.existsSync('/bin/bash')) return '/bin/bash';
+      if (fs.existsSync('/bin/zsh')) return '/bin/zsh';
+      return '/bin/sh';
     }
-
-    const shell =
-      this.options.isPackaged && this.options.platform === 'darwin'
-        ? '/bin/sh'
-        : process.env.SHELL ||
-          (fs.existsSync('/bin/bash')
-            ? '/bin/bash'
-            : fs.existsSync('/bin/zsh')
-              ? '/bin/zsh'
-              : '/bin/sh');
-
-    const fullCommand = this.buildShellCommand(command, args);
-    return { file: shell, args: ['-c', fullCommand] };
   }
+
+  private getShellArgs(command: string): string[] {
+    if (this.options.platform === 'win32') {
+      return ['/s', '/c', command];
+    } else {
+      return ['-c', command];
+    }
+  }
+}
+
+interface AskUserQuestionInput {
+  questions?: Array<{
+    question: string;
+    header?: string;
+    options?: Array<{ label: string; description?: string }>;
+    multiSelect?: boolean;
+  }>;
 }
 
 interface StartTaskInput {

@@ -412,3 +412,37 @@ export {
   resumeSessionSchema,
   validate,
 } from './common/schemas/validation.js';
+
+// -----------------------------------------------------------------------------
+// Sandbox Module (from ./sandbox/)
+// -----------------------------------------------------------------------------
+
+export type {
+  SandboxNetworkMode,
+  SandboxResourceLimits,
+  SandboxUserMapping,
+  SandboxMount,
+  SandboxConfig,
+  ResolvedSandboxConfig,
+  DockerCommandResult,
+  SandboxRunOptions,
+  DockerRunSpec,
+} from './sandbox/index.js';
+
+export {
+  resolveSandboxConfig,
+  getHostUserMapping,
+  toContainerCommand,
+  dockerImageExists,
+  dockerPullImage,
+  dockerRmForceSync,
+  runDockerCommand,
+  prepareDockerSandbox,
+  buildDockerRunSpec,
+  disposeDockerRunSpec,
+  createSandboxContainerName,
+  registerSandboxCleanupCallback,
+  unregisterSandboxCleanupCallback,
+  ensureSandboxProcessCleanupHandlers,
+  redactDockerArgsForLogging,
+} from './sandbox/index.js';
